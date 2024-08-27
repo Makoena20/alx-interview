@@ -1,54 +1,60 @@
 #!/usr/bin/python3
 import sys
-import signal
+import re
 from collections import defaultdict
+import signal
+import functools
 
-# Initialize counters and accumulators
-status_codes = defaultdict(int)
+# Initialize variables
 total_file_size = 0
+status_codes_count = defaultdict(int)
 line_count = 0
+lines_per_print = 10
 
-def print_stats():
-    """Prints the accumulated statistics."""
-    global total_file_size, status_codes
-    print(f"File size: {total_file_size}")
-    for code in sorted(status_codes.keys()):
-        print(f"{code}: {status_codes[code]}")
+# Regular expression to match the log line format
+log_pattern = re.compile(
+    r'^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}) - \[.*?\] "GET /projects/260 HTTP/1.1" (\d{3}) (\d+)$'
+)
 
-def signal_handler(sig, frame):
-    """Handle keyboard interruption (CTRL+C)."""
-    print_stats()
+def handle_interrupt(signum, frame):
+    print_metrics()
     sys.exit(0)
 
-def main():
-    global total_file_size, status_codes, line_count
+def print_metrics():
+    # Print total file size
+    print(f"File size: {total_file_size}")
     
-    # Register signal handler for keyboard interruption
-    signal.signal(signal.SIGINT, signal_handler)
-    
-    for line in sys.stdin:
-        parts = line.split()
-        if len(parts) == 7 and parts[2] == '-' and parts[3].startswith('[') and parts[4].startswith('"GET') and parts[5].startswith('HTTP') and parts[6].isdigit():
-            try:
-                # Extract file size and status code
-                file_size = int(parts[6])
-                status_code = int(parts[5].split('/')[1])
-                
-                # Update counters
-                total_file_size += file_size
-                status_codes[status_code] += 1
-                line_count += 1
-                
-                # Print stats every 10 lines
-                if line_count % 10 == 0:
-                    print_stats()
-                    # Reset counters for the next batch
-                    total_file_size = 0
-                    status_codes = defaultdict(int)
-                    
-    # Print final stats if no interruption occurred
-    print_stats()
+    # Print status codes count
+    for status_code in sorted(status_codes_count.keys()):
+        print(f"{status_code}: {status_codes_count[status_code]}")
 
-if __name__ == "__main__":
-    main()
+def process_line(line):
+    global total_file_size
+    global status_codes_count
+    global line_count
+
+    match = log_pattern.match(line)
+    if match:
+        ip, status_code, file_size = match.groups()
+        file_size = int(file_size)
+        status_code = int(status_code)
+        
+        # Update metrics
+        total_file_size += file_size
+        status_codes_count[status_code] += 1
+        line_count += 1
+
+        # Print metrics if the line count is a multiple of lines_per_print
+        if line_count % lines_per_print == 0:
+            print_metrics()
+
+# Set up signal handler for keyboard interruption
+signal.signal(signal.SIGINT, handle_interrupt)
+
+# Read from stdin line by line
+for line in sys.stdin:
+    process_line(line)
+
+# Final metrics print after reading all lines
+print_metrics()
 
