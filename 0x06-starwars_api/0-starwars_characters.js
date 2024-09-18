@@ -8,31 +8,37 @@ const movieId = process.argv[2];
 // Define the base URL for the Star Wars API
 const apiUrl = `https://swapi.dev/api/films/${movieId}/`;
 
-// Make a GET request to fetch the film details
-request(apiUrl, (error, response, body) => {
+// Function to fetch a character and log their name
+function fetchCharacter(url) {
+  return new Promise((resolve, reject) => {
+    request(url, (error, response, body) => {
+      if (error) {
+        reject(error);
+      } else {
+        const characterData = JSON.parse(body);
+        console.log(characterData.name);
+        resolve();
+      }
+    });
+  });
+}
+
+// Main function to handle the movie request and process characters sequentially
+request(apiUrl, async (error, response, body) => {
   if (error) {
     console.error(error);
     return;
   }
 
-  // Parse the JSON response
   const filmData = JSON.parse(body);
-
-  // Extract the list of character URLs
   const characters = filmData.characters;
 
-  // Loop through the characters and make a GET request to fetch each one
-  characters.forEach(characterUrl => {
-    request(characterUrl, (error, response, body) => {
-      if (error) {
-        console.error(error);
-        return;
-      }
-
-      // Parse the character details and print the name
-      const characterData = JSON.parse(body);
-      console.log(characterData.name);
-    });
-  });
+  for (const characterUrl of characters) {
+    try {
+      await fetchCharacter(characterUrl);
+    } catch (error) {
+      console.error(error);
+    }
+  }
 });
 
