@@ -9,9 +9,11 @@ def is_prime(num):
             return False
     return True
 
+
 def count_primes(n):
     """Counts the number of prime numbers up to n."""
     return sum(1 for i in range(1, n + 1) if is_prime(i))
+
 
 def isWinner(x, nums):
     """Determines the winner of the prime game."""
